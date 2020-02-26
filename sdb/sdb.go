@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/zngw/set"
 )
 
 var db *sql.DB
@@ -19,6 +20,7 @@ func Init(file string) (err error) {
 	return
 }
 
+// 文章浏览次数 ===========================================
 func CreateTable(name string) (err error) {
 	table := `
     CREATE TABLE IF NOT EXISTS %s (
@@ -130,3 +132,52 @@ func SortByTime(name string, limit int) (lt []CountData) {
 
 	return
 }
+// 文章浏览次数结束 ===============================================
+
+// UV数据 ========================================================
+func CreateUVTable(name string) (err error) {
+	table := `
+    CREATE TABLE IF NOT EXISTS uv_%s (
+        uid INTEGER PRIMARY KEY AUTOINCREMENT,
+        ip VARCHAR(16) NULL
+    );
+    `
+	cmd := fmt.Sprintf(table, name)
+	_, err = db.Exec(cmd)
+	return
+}
+
+func GetUVIPList(name string) (list *set.Set) {
+	query := `SELECT ip FROM uv_%s`
+	rows, err := db.Query(fmt.Sprintf(query, name))
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+
+	list = set.New()
+	for rows.Next() {
+		var ip string
+		err = rows.Scan(&ip)
+		list.Add(ip)
+	}
+	return
+}
+
+func UpdateUVIP(name string, ips []string) (err error) {
+	pre := `INSERT INTO uv_%s (ip) values(?)`
+	stmt, err := db.Prepare(fmt.Sprintf(pre, name))
+	if stmt == nil || err != nil {
+		return
+	}
+
+	for _, ip := range ips{
+		_, err = stmt.Exec(ip)
+		if err != nil {
+			return
+		}
+	}
+
+	return
+}
+// UV数据结束
