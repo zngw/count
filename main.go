@@ -133,8 +133,15 @@ func add(w http.ResponseWriter, r *http.Request) {
 	if !Cfg.CheckUser(data.User) {
 		send(w,[]byte(`{"time":0}`))
 	}
-
-	num := sdb.AddCount(data.User, data.Title, data.Url)
+	
+	var num = 0
+	// 排除localhost统计
+	if strings.Index(r.Host, "localhost") == -1 {
+		num = sdb.AddCount(data.User, data.Title, data.Url)
+	}else {
+		num = sdb.GetCount(data.User, data.Url)
+	}
+	
 	uv := uv.Add(data.User, clientIP(r))
 	send(w, []byte(fmt.Sprintf(`{"time":%v,"uv":%v}`, num,uv)))
 }
