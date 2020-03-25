@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/zngw/count/sdb"
 	"github.com/zngw/count/uv"
+	"github.com/zngw/log"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -34,24 +35,32 @@ func (p *Config)CheckUser(user string) bool {
 var Cfg Config
 
 func main() {
-	// 读取配置
-	raw, err := ioutil.ReadFile("./config.json")
+	// 初始始日志
+	err := log.Init("",[]string{"sys","net"})
 	if err != nil {
 		panic(err)
+		return
+	}
+	// 读取配置
+	log.Trace("sys","读取配置文件")
+	raw, err := ioutil.ReadFile("./config.json")
+	if err != nil {
+		log.Error(err)
 		return
 	}
 
 	// 序列化配置数据
 	err = json.Unmarshal(raw, &Cfg)
 	if err != nil {
-		panic(err)
+		log.Error(err)
 		return
 	}
 
 	// 初始化数据库
+	log.Trace("sys","初始化数据库")
 	err = sdb.Init(Cfg.DB)
 	if err != nil {
-		panic(err)
+		log.Error(err)
 		return
 	}
 
@@ -62,7 +71,7 @@ func main() {
 	for _, user := range Cfg.User {
 		err = sdb.CreateTable(user)
 		if err != nil {
-			panic(err)
+			log.Error(err)
 			return
 		}
 	}
@@ -73,9 +82,10 @@ func main() {
 	http.HandleFunc("/count/top", top)       // 获取排行
 	err = http.ListenAndServe(Cfg.Addr, nil) // 设置监听的端口
 	if err != nil {
-		panic(err)
+		log.Error(err)
 	}
 
+	log.Trace("sys","服务器启动成功：",Cfg.Addr)
 	signal.Ignore(syscall.SIGHUP)
 	runtime.Goexit()
 }
@@ -135,6 +145,8 @@ func add(w http.ResponseWriter, r *http.Request) {
 	}
 	
 	var num = 0
+
+	log.Trace("net", r.Host)
 	// 排除localhost统计
 	if strings.Index(r.Host, "localhost") == -1 {
 		num = sdb.AddCount(data.User, data.Title, data.Url)
