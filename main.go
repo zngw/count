@@ -131,7 +131,7 @@ func add(w http.ResponseWriter, r *http.Request) {
 		User  string `json:"user"`  // 用户
 		Title string `json:"title"` // 标题
 		Url   string `json:"url"`   // 地址
-		Host string `json:"Host"`	// 来源网址
+		Host string `json:"host"`	// 来源网址
 	}
 
 	var data tmp
