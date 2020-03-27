@@ -48,17 +48,18 @@ func main() {
 		return
 	}
 
-	// 初始始日志
-	err = log.Init(Cfg.LogFile,[]string{"sys","net"})
-	if err != nil {
-		panic(err)
-		return
-	}
-
 	// 序列化配置数据
 	err = json.Unmarshal(raw, &Cfg)
 	if err != nil {
 		log.Error(err)
+		return
+	}
+
+	// 初始始日志
+	fmt.Println("日志路径:",Cfg.LogFile)
+	err = log.Init(Cfg.LogFile,[]string{"sys","net"})
+	if err != nil {
+		panic(err)
 		return
 	}
 
