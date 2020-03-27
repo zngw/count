@@ -38,7 +38,6 @@ var Cfg Config
 
 func main() {
 	cfg := flag.String("c", "./config.json", "默认配置为 ./config.json")
-	logfile := flag.String("l", "", "默认配置为 logs")
 	flag.Parse()
 
 	// 读取配置
