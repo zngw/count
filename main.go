@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"github.com/zngw/count/sdb"
 	"github.com/zngw/count/uv"
@@ -41,9 +42,12 @@ func main() {
 		panic(err)
 		return
 	}
+	cfg := flag.String("c", "./config.json", "默认配置为 ./config.json")
+	flag.Parse()
+
 	// 读取配置
-	log.Trace("sys","读取配置文件")
-	raw, err := ioutil.ReadFile("./config.json")
+	log.Trace("sys","读取配置文件:",*cfg)
+	raw, err := ioutil.ReadFile(*cfg)
 	if err != nil {
 		log.Error(err)
 		return
