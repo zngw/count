@@ -36,14 +36,16 @@ func (p *Config)CheckUser(user string) bool {
 var Cfg Config
 
 func main() {
+	cfg := flag.String("c", "./config.json", "默认配置为 ./config.json")
+	logfile := flag.String("l", "", "默认配置为 logs")
+	flag.Parse()
+
 	// 初始始日志
-	err := log.Init("",[]string{"sys","net"})
+	err := log.Init(*logfile,[]string{"sys","net"})
 	if err != nil {
 		panic(err)
 		return
 	}
-	cfg := flag.String("c", "./config.json", "默认配置为 ./config.json")
-	flag.Parse()
 
 	// 读取配置
 	log.Trace("sys","读取配置文件:",*cfg)
