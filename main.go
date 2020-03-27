@@ -18,6 +18,7 @@ import (
 
 // 配置文件结构体
 type Config struct {
+	LogFile string `json:"log"`   // DB文件
 	Addr string   `json:"addr"` // 端口
 	DB   string   `json:"db"`   // DB文件
 	User []string `json:"user"` // 启用用户名
@@ -40,18 +41,18 @@ func main() {
 	logfile := flag.String("l", "", "默认配置为 logs")
 	flag.Parse()
 
-	// 初始始日志
-	err := log.Init(*logfile,[]string{"sys","net"})
+	// 读取配置
+	log.Trace("sys","读取配置文件:",*cfg)
+	raw, err := ioutil.ReadFile(*cfg)
 	if err != nil {
 		panic(err)
 		return
 	}
 
-	// 读取配置
-	log.Trace("sys","读取配置文件:",*cfg)
-	raw, err := ioutil.ReadFile(*cfg)
+	// 初始始日志
+	err = log.Init(Cfg.LogFile,[]string{"sys","net"})
 	if err != nil {
-		log.Error(err)
+		panic(err)
 		return
 	}
 
