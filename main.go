@@ -41,7 +41,7 @@ func main() {
 	flag.Parse()
 
 	// 读取配置
-	log.Trace("sys","读取配置文件:",*cfg)
+	fmt.Println("读取配置文件:",*cfg)
 	raw, err := ioutil.ReadFile(*cfg)
 	if err != nil {
 		panic(err)
@@ -156,11 +156,11 @@ func add(w http.ResponseWriter, r *http.Request) {
 	var num = 0
 	log.Trace("net", ip,"->",data.Host,data.Url)
 	// 排除localhost统计
-	if strings.Index(data.Host, "localhost") == -1 {
+	//if strings.Index(data.Host, "localhost") == -1 {
 		num = sdb.AddCount(data.User, data.Title, data.Url)
-	}else {
-		num = sdb.GetCount(data.User, data.Url)
-	}
+	//}else {
+		//num = sdb.GetCount(data.User, data.Url)
+	//}
 
 	uv := uv.Add(data.User, ip)
 	send(w, []byte(fmt.Sprintf(`{"time":%v,"uv":%v}`, num,uv)))

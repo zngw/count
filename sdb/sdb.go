@@ -18,7 +18,7 @@ type CountData struct {
 }
 
 var db *sql.DB
-var dataMap sync.Map //= make(map[string][]*CountData)	// 根据数据特性这里用降序list
+var dataMap sync.Map //根据数据特性这里用降序list
 var lock sync.Mutex //记数互斥锁
 
 func Init(file string) (err error) {
@@ -73,15 +73,16 @@ func CreateTable(name string) (err error) {
 		return dataList[i].Time > dataList[j].Time
 	})
 
-	dataMap.Store(name,dataList)
+	dataMap.Store(name,&dataList)
 	return
 }
 
 func save()  {
 	dataMap.Range(func(k, v interface{}) bool {
-		dataList := v.([]*CountData)
-		for i,_ := range dataList {
-			data := dataList[i]
+		dataList := v.(*[]*CountData)
+		//dataList := v.([]*CountData)
+		for i,_ := range *dataList {
+			data := (*dataList)[i]
 			if data.Update {
 				data.Update = false
 
@@ -106,20 +107,21 @@ func AddCount(name, title, url string) int {
 	if !ok {
 		return 0
 	}
-	dataList := v.([]*CountData)
+	//dataList := v.([]*CountData)
+	dataList := v.(*[]*CountData)
 	lock.Lock()
 	defer lock.Unlock()
-	for i,_ := range dataList{
-		data := dataList[i]
+	for i,_ := range *dataList{
+		data := (*dataList)[i]
 		if data.Url == url {
 			// 存在
 			data.Time++
 			data.Update = true
 
 			// 与前一个比较，是否需要调整顺序
-			if i > 0 && data.Time>dataList[i-1].Time {
-				dataList[i] = dataList[i-1]
-				dataList[i-1] = data
+			if i > 0 && data.Time>(*dataList)[i-1].Time {
+				(*dataList)[i] = (*dataList)[i-1]
+				(*dataList)[i-1] = data
 			}
 			return data.Time
 		}
@@ -130,7 +132,7 @@ func AddCount(name, title, url string) int {
 	data.Url = url
 	data.Time = 1
 	data.Title = title
-	dataList = append(dataList, data)
+	*dataList = append(*dataList, data)
 
 	go func() {
 		// 插入数据
@@ -152,10 +154,10 @@ func GetCount(name string, url string)  int {
 	if !ok {
 		return 0
 	}
-	dataList := v.([]*CountData)
+	dataList := v.(*[]*CountData)
 
-	for i,_ := range dataList {
-		data := dataList[i]
+	for i,_ := range *dataList {
+		data := (*dataList)[i]
 		if data.Url == url {
 			return data.Time
 		}
@@ -174,14 +176,14 @@ func GetCounts(name string, urls []string) (cr []CR) {
 	if !ok {
 		return
 	}
-	dataList := v.([]*CountData)
+	dataList := v.(*[]*CountData)
 
-	for i,_ := range dataList {
+	for i,_ := range *dataList {
 		for j, _ := range urls{
-			if dataList[i].Url == urls[j] {
+			if (*dataList)[i].Url == urls[j] {
 				var data CR
-				data.Url = dataList[i].Url
-				data.Time = dataList[i].Time
+				data.Url = (*dataList)[i].Url
+				data.Time = (*dataList)[i].Time
 				cr = append(cr, data)
 				break
 			}
@@ -196,14 +198,14 @@ func SortByTime(name string, limit int) (lt []CountData) {
 	if !ok {
 		return
 	}
-	dataList := v.([]*CountData)
+	dataList := v.(*[]*CountData)
 
-	for i,_ := range dataList {
+	for i,_ := range *dataList {
 		if i >= limit {
 			break
 		}
 
-		lt = append(lt, *dataList[i])
+		lt = append(lt, *(*dataList)[i])
 	}
 
 	return
