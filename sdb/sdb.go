@@ -83,6 +83,8 @@ func save()  {
 		for i,_ := range dataList {
 			data := dataList[i]
 			if data.Update {
+				data.Update = false
+
 				// 更新数据
 				pre := `update %s set time=? where url=?`
 				stmt, err := db.Prepare(fmt.Sprintf(pre, k))
@@ -90,10 +92,8 @@ func save()  {
 					return true
 				}
 				// data是批针指向dataMap中的数据，如多线程顺序乱了也不会影响最终写的数据为内存中的值
-				_, err = stmt.Exec(data.Time, data.Url)
-				if err != nil {
-					return true
-				}
+				_, _ = stmt.Exec(data.Time, data.Url)
+				_ = stmt.Close()
 			}
 		}
 
@@ -140,10 +140,8 @@ func AddCount(name, title, url string) int {
 			return
 		}
 
-		_, err = stmt.Exec(data.Title, data.Url, data.Time)
-		if err != nil {
-			return
-		}
+		_, _ = stmt.Exec(data.Title, data.Url, data.Time)
+		_ = stmt.Close()
 	}()
 
 	return data.Time
@@ -248,6 +246,8 @@ func UpdateUVIP(name string, ips []string) (err error) {
 	if stmt == nil || err != nil {
 		return
 	}
+
+	defer stmt.Close()
 
 	for _, ip := range ips{
 		_, err = stmt.Exec(ip)
