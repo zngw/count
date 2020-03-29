@@ -18,14 +18,15 @@ import (
 
 // 配置文件结构体
 type Config struct {
-	LogFile string `json:"log"`   // DB文件
-	Addr string   `json:"addr"` // 端口
-	DB   string   `json:"db"`   // DB文件
-	User []string `json:"user"` // 启用用户名
+	LogFile string   `json:"log"`    // DB文件
+	LogTag  []string `json:"logTag"` // 日志输出类型
+	Addr    string   `json:"addr"`   // 端口
+	DB      string   `json:"db"`     // DB文件
+	User    []string `json:"user"`   // 启用用户名
 }
 
-func (p *Config)CheckUser(user string) bool {
-	for i,_ := range p.User{
+func (p *Config) CheckUser(user string) bool {
+	for i, _ := range p.User {
 		if user == p.User[i] {
 			return true
 		}
@@ -41,7 +42,7 @@ func main() {
 	flag.Parse()
 
 	// 读取配置
-	fmt.Println("读取配置文件:",*cfg)
+	fmt.Println("读取配置文件:", *cfg)
 	raw, err := ioutil.ReadFile(*cfg)
 	if err != nil {
 		panic(err)
@@ -56,15 +57,15 @@ func main() {
 	}
 
 	// 初始始日志
-	fmt.Println("日志路径:",Cfg.LogFile)
-	err = log.Init(Cfg.LogFile,[]string{"sys","net"})
+	fmt.Println("日志路径:", Cfg.LogFile)
+	err = log.Init(Cfg.LogFile, Cfg.LogTag)
 	if err != nil {
 		panic(err)
 		return
 	}
 
 	// 初始化数据库
-	log.Trace("sys","初始化数据库")
+	log.Trace("sys", "初始化数据库")
 	err = sdb.Init(Cfg.DB)
 	if err != nil {
 		log.Error(err)
@@ -84,15 +85,17 @@ func main() {
 	}
 
 	// 监听事件
-	http.HandleFunc("/count/add", add)       // 增加次数
-	http.HandleFunc("/count/get", get)       // 获取次数
-	http.HandleFunc("/count/top", top)       // 获取排行
-	err = http.ListenAndServe(Cfg.Addr, nil) // 设置监听的端口
-	if err != nil {
-		log.Error(err)
-	}
+	http.HandleFunc("/count/add", add) // 增加次数
+	http.HandleFunc("/count/get", get) // 获取次数
+	http.HandleFunc("/count/top", top) // 获取排行
+	go func() {
+		err = http.ListenAndServe(Cfg.Addr, nil) // 设置监听的端口
+		if err != nil {
+			log.Error(err)
+		}
+	}()
 
-	log.Trace("sys","服务器启动成功：",Cfg.Addr)
+	log.Trace("sys", "服务器启动成功：", Cfg.Addr)
 	signal.Ignore(syscall.SIGHUP)
 	runtime.Goexit()
 }
@@ -138,7 +141,7 @@ func add(w http.ResponseWriter, r *http.Request) {
 		User  string `json:"user"`  // 用户
 		Title string `json:"title"` // 标题
 		Url   string `json:"url"`   // 地址
-		Host string `json:"host"`	// 来源网址
+		Host  string `json:"host"`  // 来源网址
 	}
 
 	var data tmp
@@ -149,21 +152,21 @@ func add(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !Cfg.CheckUser(data.User) {
-		send(w,[]byte(`{"time":0}`))
+		send(w, []byte(`{"time":0}`))
 	}
 
 	ip := clientIP(r)
 	var num = 0
-	log.Trace("net", ip,"->",data.Host,data.Url)
+	log.Trace("record", ip, "->", data.Host+data.Url, "[", data.Title, "]")
 	// 排除localhost统计
-	//if strings.Index(data.Host, "localhost") == -1 {
+	if strings.Index(data.Host, "localhost") == -1 {
 		num = sdb.AddCount(data.User, data.Title, data.Url)
-	//}else {
-		//num = sdb.GetCount(data.User, data.Url)
-	//}
+	} else {
+		num = sdb.GetCount(data.User, data.Url)
+	}
 
 	uv := uv.Add(data.User, ip)
-	send(w, []byte(fmt.Sprintf(`{"time":%v,"uv":%v}`, num,uv)))
+	send(w, []byte(fmt.Sprintf(`{"time":%v,"uv":%v}`, num, uv)))
 }
 
 // 获取次数
@@ -184,7 +187,7 @@ func get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !Cfg.CheckUser(data.User) {
-		send(w,[]byte(`[]`))
+		send(w, []byte(`[]`))
 	}
 
 	results := sdb.GetCounts(data.User, data.Url)
@@ -210,7 +213,7 @@ func top(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !Cfg.CheckUser(data.User) {
-		send(w,[]byte(`[]`))
+		send(w, []byte(`[]`))
 	}
 
 	ls := sdb.SortByTime(data.User, data.Limit)
