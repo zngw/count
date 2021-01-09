@@ -1,0 +1,8 @@
+github.com/cihub/seelog v0.0.0-20170130134532-f561c5e57575 h1:kHaBemcxl8o/pQ5VM1c8PVE1PubbNx3mjUr09OqWGCs=
+github.com/cihub/seelog v0.0.0-20170130134532-f561c5e57575/go.mod h1:9d6lWj8KzO/fd/NrVaLscBKmPigpZpn5YawRPw+e3Yo=
+github.com/mattn/go-sqlite3 v1.14.6 h1:dNPt6NO46WmLVt2DLNpwczCmdV5boIZ6g/tlDrlRUbg=
+github.com/mattn/go-sqlite3 v1.14.6/go.mod h1:NyWgC/yNuGj7Q9rpYnZvas74GogHl5/Z4A/KQRfk6bU=
+github.com/zngw/log v0.0.0-20200327115753-04ba41d5c8f8 h1:G3/EW2E6t+SST21g2S5ocgKMgxduQgUqMJmqYEmnGww=
+github.com/zngw/log v0.0.0-20200327115753-04ba41d5c8f8/go.mod h1:Rh4nrqVEbW6EVxIg6lul++h92bj3mQFIpv+LoAQdFuA=
+github.com/zngw/set v0.0.0-20200226145050-84360fd7d9d2 h1:nMMm4NSRPttIh8Z1pihCMMXR7jRffp+AQK6jj+7pIs0=
+github.com/zngw/set v0.0.0-20200226145050-84360fd7d9d2/go.mod h1:cRGgsMhrpgoYuTd8iPkbhGI0zPNhX8owfV4WdSsoS8s=

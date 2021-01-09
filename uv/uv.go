@@ -8,14 +8,14 @@ import (
 )
 
 type Info struct {
-	Update *set.Set 	// 需要更新的ip
-	IP *set.Set		// IP信息
+	Update *set.Set // 需要更新的ip
+	IP     *set.Set // IP信息
 }
 
 var UserUV sync.Map
 
-func Init(User []string)  {
-	for _, u := range User{
+func Init(User []string) {
+	for _, u := range User {
 		// 从数据库中读取
 		_ = sdb.CreateUVTable(u)
 
@@ -37,7 +37,7 @@ func Init(User []string)  {
 func Add(name, ip string) (count int) {
 	if v, ok := UserUV.Load(name); ok {
 		info := v.(Info)
-		if info.Update.Has(ip) || info.IP.Has(ip){
+		if info.Update.Has(ip) || info.IP.Has(ip) {
 			count = info.Update.Len() + info.IP.Len()
 			return
 		}
@@ -49,7 +49,7 @@ func Add(name, ip string) (count int) {
 	return
 }
 
-func save()  {
+func save() {
 	UserUV.Range(func(k, v interface{}) bool {
 		info := v.(Info)
 		if !info.Update.IsEmpty() {
@@ -60,7 +60,7 @@ func save()  {
 				return true
 			})
 			info.Update.Clear()
-			_ = sdb.UpdateUVIP(k.(string),ips)
+			_ = sdb.UpdateUVIP(k.(string), ips)
 		}
 		return true
 	})
