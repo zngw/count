@@ -78,7 +78,7 @@ func main() {
 		}
 	}()
 
-	tranS2M()
+	//tranS2M()
 
 	log.Trace("sys", "服务器启动成功：", cfg.Cfg.Addr)
 	signal.Ignore(syscall.SIGHUP)

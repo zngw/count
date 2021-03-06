@@ -29,7 +29,7 @@ func Init(User []string) {
 	go func() {
 		for true {
 			save()
-			time.Sleep(time.Minute)
+			time.Sleep(time.Second)
 		}
 	}()
 }

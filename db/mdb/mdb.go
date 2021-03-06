@@ -219,7 +219,9 @@ func GetUVIPList(name string) (list *set.Set) {
 
 func UpdateUVIP(name string, ips []string) (err error) {
 	c := dbc(name, DbcUV)
-	err = c.Insert(ips)
+	for _, ip := range ips {
+		err = c.Insert(bson.M{"ip": ip})
+	}
 	return
 }
 
