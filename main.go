@@ -4,7 +4,11 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/zngw/count/sdb"
+	"github.com/zngw/count/cfg"
+	"github.com/zngw/count/data"
+	"github.com/zngw/count/db"
+	"github.com/zngw/count/db/mdb"
+	"github.com/zngw/count/db/sdb"
 	"github.com/zngw/count/uv"
 	"github.com/zngw/log"
 	"io/ioutil"
@@ -16,49 +20,28 @@ import (
 	"syscall"
 )
 
-// 配置文件结构体
-type Config struct {
-	LogFile string   `json:"log"`    // DB文件
-	LogTag  []string `json:"logTag"` // 日志输出类型
-	Addr    string   `json:"addr"`   // 端口
-	DB      string   `json:"db"`     // DB文件
-	User    []string `json:"user"`   // 启用用户名
-}
-
-func (p *Config) CheckUser(user string) bool {
-	for i, _ := range p.User {
-		if user == p.User[i] {
-			return true
-		}
-	}
-
-	return false
-}
-
-var Cfg Config
-
 func main() {
-	cfg := flag.String("c", "./config.json", "默认配置为 ./config.json")
+	c := flag.String("c", "./config.json", "默认配置为 ./config.json")
 	flag.Parse()
 
 	// 读取配置
-	fmt.Println("读取配置文件:", *cfg)
-	raw, err := ioutil.ReadFile(*cfg)
+	fmt.Println("读取配置文件:", *c)
+	raw, err := ioutil.ReadFile(*c)
 	if err != nil {
 		panic(err)
 		return
 	}
 
 	// 序列化配置数据
-	err = json.Unmarshal(raw, &Cfg)
+	err = json.Unmarshal(raw, &cfg.Cfg)
 	if err != nil {
 		log.Error(err)
 		return
 	}
 
 	// 初始始日志
-	fmt.Println("日志路径:", Cfg.LogFile)
-	err = log.Init(Cfg.LogFile, Cfg.LogTag)
+	fmt.Println("日志路径:", cfg.Cfg.LogFile)
+	err = log.Init(cfg.Cfg.LogFile, cfg.Cfg.LogTag)
 	if err != nil {
 		panic(err)
 		return
@@ -66,18 +49,18 @@ func main() {
 
 	// 初始化数据库
 	log.Trace("sys", "初始化数据库")
-	err = sdb.Init(Cfg.DB)
+	err = db.Init()
 	if err != nil {
 		log.Error(err)
 		return
 	}
 
 	// 初始化UV信息
-	uv.Init(Cfg.User)
+	uv.Init(cfg.Cfg.User)
 
 	// 根据用户创建表，一个用户一个表
-	for _, user := range Cfg.User {
-		err = sdb.CreateTable(user)
+	for _, user := range cfg.Cfg.User {
+		err = db.CreateTable(user)
 		if err != nil {
 			log.Error(err)
 			return
@@ -89,13 +72,15 @@ func main() {
 	http.HandleFunc("/count/get", get) // 获取次数
 	http.HandleFunc("/count/top", top) // 获取排行
 	go func() {
-		err = http.ListenAndServe(Cfg.Addr, nil) // 设置监听的端口
+		err = http.ListenAndServe(cfg.Cfg.Addr, nil) // 设置监听的端口
 		if err != nil {
 			log.Error(err)
 		}
 	}()
 
-	log.Trace("sys", "服务器启动成功：", Cfg.Addr)
+	tranS2M()
+
+	log.Trace("sys", "服务器启动成功：", cfg.Cfg.Addr)
 	signal.Ignore(syscall.SIGHUP)
 	runtime.Goexit()
 }
@@ -144,6 +129,11 @@ func add(w http.ResponseWriter, r *http.Request) {
 		Host  string `json:"host"`  // 来源网址
 	}
 
+	if len(param) == 0 {
+		send(w, []byte(`{"time":0, "uv":0}`))
+		return
+	}
+
 	var data tmp
 	err := json.Unmarshal(param, &data)
 	if err != nil {
@@ -151,8 +141,9 @@ func add(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !Cfg.CheckUser(data.User) {
+	if !cfg.Cfg.CheckUser(data.User) {
 		send(w, []byte(`{"time":0}`))
+		return
 	}
 
 	ip := clientIP(r)
@@ -160,9 +151,9 @@ func add(w http.ResponseWriter, r *http.Request) {
 	log.Trace("record", ip, "->", data.Host+data.Url, "[", data.Title, "]")
 	// 排除localhost统计
 	if strings.Index(data.Host, "localhost") == -1 {
-		num = sdb.AddCount(data.User, data.Title, data.Url)
+		num = db.AddCount(data.User, data.Title, data.Url)
 	} else {
-		num = sdb.GetCount(data.User, data.Url)
+		num = db.GetCount(data.User, data.Url)
 	}
 
 	uv := uv.Add(data.User, ip)
@@ -186,11 +177,11 @@ func get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !Cfg.CheckUser(data.User) {
+	if !cfg.Cfg.CheckUser(data.User) {
 		send(w, []byte(`[]`))
 	}
 
-	results := sdb.GetCounts(data.User, data.Url)
+	results := db.GetCounts(data.User, data.Url)
 	b, err := json.Marshal(results)
 	send(w, b)
 }
@@ -212,11 +203,11 @@ func top(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !Cfg.CheckUser(data.User) {
+	if !cfg.Cfg.CheckUser(data.User) {
 		send(w, []byte(`[]`))
 	}
 
-	ls := sdb.SortByTime(data.User, data.Limit)
+	ls := db.SortByTime(data.User, data.Limit)
 	if ls == nil {
 		send(w, []byte("[]"))
 		return
@@ -224,4 +215,39 @@ func top(w http.ResponseWriter, r *http.Request) {
 
 	b, err := json.Marshal(ls)
 	send(w, b)
+}
+
+// sqlite3 转 mongdb
+func tranS2M() {
+	user := "guoke3915"
+	sdb.Init()
+	mdb.Init()
+	// 读取 Count
+	err := sdb.CreateTable(user)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	v, ok := data.DataMap.Load(user)
+	if !ok {
+		return
+	}
+
+	dataList := v.(*[]*data.CountData)
+	for i, _ := range *dataList {
+		dt := (*dataList)[i]
+		dt.Update = true
+		dt.User = user
+	}
+
+	mdb.Save()
+
+	// 读取UV
+	st := sdb.GetUVIPList(user)
+	var lst []string
+	for _, s := range st.List() {
+		lst = append(lst, s.(string))
+	}
+	_ = mdb.UpdateUVIP(user, lst)
 }

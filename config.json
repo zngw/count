@@ -1,7 +1,9 @@
 {
   "log": "logs/log",
   "logTag" : ["sys","net","record"],
-  "addr":":80",
-  "db":"count.db",
+  "addr":":8080",
+  "dbType": "mdb",
+  "dbFile":"count.db",
+  "dbUrl":"mongodb://root:Vens123.@vm.com:3717/admin",
   "user":[ "guoke3915"]
 }

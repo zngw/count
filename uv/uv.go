@@ -1,7 +1,7 @@
 package uv
 
 import (
-	"github.com/zngw/count/sdb"
+	"github.com/zngw/count/db"
 	"github.com/zngw/set"
 	"sync"
 	"time"
@@ -17,11 +17,11 @@ var UserUV sync.Map
 func Init(User []string) {
 	for _, u := range User {
 		// 从数据库中读取
-		_ = sdb.CreateUVTable(u)
+		_ = db.CreateUVTable(u)
 
 		info := Info{}
 		info.Update = set.New()
-		info.IP = sdb.GetUVIPList(u)
+		info.IP = db.GetUVIPList(u)
 
 		UserUV.Store(u, info)
 	}
@@ -29,7 +29,7 @@ func Init(User []string) {
 	go func() {
 		for true {
 			save()
-			time.Sleep(time.Second)
+			time.Sleep(time.Minute)
 		}
 	}()
 }
@@ -60,7 +60,7 @@ func save() {
 				return true
 			})
 			info.Update.Clear()
-			_ = sdb.UpdateUVIP(k.(string), ips)
+			_ = db.UpdateUVIP(k.(string), ips)
 		}
 		return true
 	})

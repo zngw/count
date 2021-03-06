@@ -6,3 +6,5 @@ github.com/zngw/log v0.0.0-20200327115753-04ba41d5c8f8 h1:G3/EW2E6t+SST21g2S5ocg
 github.com/zngw/log v0.0.0-20200327115753-04ba41d5c8f8/go.mod h1:Rh4nrqVEbW6EVxIg6lul++h92bj3mQFIpv+LoAQdFuA=
 github.com/zngw/set v0.0.0-20200226145050-84360fd7d9d2 h1:nMMm4NSRPttIh8Z1pihCMMXR7jRffp+AQK6jj+7pIs0=
 github.com/zngw/set v0.0.0-20200226145050-84360fd7d9d2/go.mod h1:cRGgsMhrpgoYuTd8iPkbhGI0zPNhX8owfV4WdSsoS8s=
+gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22 h1:VpOs+IwYnYBaFnrNAeB8UUWtL3vEUnzSCL1nVjPhqrw=
+gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22/go.mod h1:yeKp02qBN3iKW1OzL3MGk2IdtZzaj7SFntXj72NppTA=

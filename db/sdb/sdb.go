@@ -4,32 +4,18 @@ import (
 	"database/sql"
 	"fmt"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/zngw/count/cfg"
+	"github.com/zngw/count/data"
 	"github.com/zngw/set"
 	"sort"
 	"sync"
-	"time"
 )
 
-type CountData struct {
-	Title  string `json:"title"`
-	Url    string `json:"url"`
-	Time   int    `json:"time"`
-	Update bool   `json:"update"`
-}
-
 var db *sql.DB
-var dataMap sync.Map //根据数据特性这里用降序list
-var lock sync.Mutex  //记数互斥锁
+var lock sync.Mutex //记数互斥锁
 
-func Init(file string) (err error) {
-	db, err = sql.Open("sqlite3", file)
-
-	go func() {
-		for true {
-			save()
-			time.Sleep(time.Second)
-		}
-	}()
+func Init() (err error) {
+	db, err = sql.Open("sqlite3", cfg.Cfg.DBFile)
 	return
 }
 
@@ -57,15 +43,15 @@ func CreateTable(name string) (err error) {
 	}
 	defer rows.Close()
 
-	dataList := make([]*CountData, 0)
+	dataList := make([]*data.CountData, 0)
 	for rows.Next() {
-		data := new(CountData)
-		err = rows.Scan(&data.Title, &data.Url, &data.Time)
+		dt := new(data.CountData)
+		err = rows.Scan(&dt.Title, &dt.Url, &dt.Time)
 		if err != nil {
 			return
 		}
 
-		dataList = append(dataList, data)
+		dataList = append(dataList, dt)
 	}
 
 	// 阅读次数Time降顺
@@ -73,18 +59,18 @@ func CreateTable(name string) (err error) {
 		return dataList[i].Time > dataList[j].Time
 	})
 
-	dataMap.Store(name, &dataList)
+	data.DataMap.Store(name, &dataList)
 	return
 }
 
-func save() {
-	dataMap.Range(func(k, v interface{}) bool {
-		dataList := v.(*[]*CountData)
+func Save() {
+	data.DataMap.Range(func(k, v interface{}) bool {
+		dataList := v.(*[]*data.CountData)
 		//dataList := v.([]*CountData)
 		for i, _ := range *dataList {
-			data := (*dataList)[i]
-			if data.Update {
-				data.Update = false
+			dt := (*dataList)[i]
+			if dt.Update {
+				dt.Update = false
 
 				// 更新数据
 				pre := `update %s set time=? where url=?`
@@ -93,7 +79,7 @@ func save() {
 					return true
 				}
 				// data是批针指向dataMap中的数据，如多线程顺序乱了也不会影响最终写的数据为内存中的值
-				_, _ = stmt.Exec(data.Time, data.Url)
+				_, _ = stmt.Exec(dt.Time, dt.Url)
 				_ = stmt.Close()
 			}
 		}
@@ -103,36 +89,36 @@ func save() {
 }
 
 func AddCount(name, title, url string) int {
-	v, ok := dataMap.Load(name)
+	v, ok := data.DataMap.Load(name)
 	if !ok {
 		return 0
 	}
 	//dataList := v.([]*CountData)
-	dataList := v.(*[]*CountData)
+	dataList := v.(*[]*data.CountData)
 	lock.Lock()
 	defer lock.Unlock()
 	for i, _ := range *dataList {
-		data := (*dataList)[i]
-		if data.Url == url {
+		dt := (*dataList)[i]
+		if dt.Url == url {
 			// 存在
-			data.Time++
-			data.Update = true
+			dt.Time++
+			dt.Update = true
 
 			// 与前一个比较，是否需要调整顺序
-			if i > 0 && data.Time > (*dataList)[i-1].Time {
+			if i > 0 && dt.Time > (*dataList)[i-1].Time {
 				(*dataList)[i] = (*dataList)[i-1]
-				(*dataList)[i-1] = data
+				(*dataList)[i-1] = dt
 			}
-			return data.Time
+			return dt.Time
 		}
 	}
 
 	// 不存在，插入
-	data := new(CountData)
-	data.Url = url
-	data.Time = 1
-	data.Title = title
-	*dataList = append(*dataList, data)
+	dt := new(data.CountData)
+	dt.Url = url
+	dt.Time = 1
+	dt.Title = title
+	*dataList = append(*dataList, dt)
 
 	go func() {
 		// 插入数据
@@ -142,49 +128,44 @@ func AddCount(name, title, url string) int {
 			return
 		}
 
-		_, _ = stmt.Exec(data.Title, data.Url, data.Time)
+		_, _ = stmt.Exec(dt.Title, dt.Url, dt.Time)
 		_ = stmt.Close()
 	}()
 
-	return data.Time
+	return dt.Time
 }
 
 func GetCount(name string, url string) int {
-	v, ok := dataMap.Load(name)
+	v, ok := data.DataMap.Load(name)
 	if !ok {
 		return 0
 	}
-	dataList := v.(*[]*CountData)
+	dataList := v.(*[]*data.CountData)
 
 	for i, _ := range *dataList {
-		data := (*dataList)[i]
-		if data.Url == url {
-			return data.Time
+		dt := (*dataList)[i]
+		if dt.Url == url {
+			return dt.Time
 		}
 	}
 
 	return 0
 }
 
-type CR struct {
-	Url  string `json:"url"`  // 地址
-	Time int    `json:"time"` // 次数
-}
-
-func GetCounts(name string, urls []string) (cr []CR) {
-	v, ok := dataMap.Load(name)
+func GetCounts(name string, urls []string) (cr []data.CR) {
+	v, ok := data.DataMap.Load(name)
 	if !ok {
 		return
 	}
-	dataList := v.(*[]*CountData)
+	dataList := v.(*[]*data.CountData)
 
 	for i, _ := range *dataList {
 		for j, _ := range urls {
 			if (*dataList)[i].Url == urls[j] {
-				var data CR
-				data.Url = (*dataList)[i].Url
-				data.Time = (*dataList)[i].Time
-				cr = append(cr, data)
+				var dt data.CR
+				dt.Url = (*dataList)[i].Url
+				dt.Time = (*dataList)[i].Time
+				cr = append(cr, dt)
 				break
 			}
 		}
@@ -193,12 +174,12 @@ func GetCounts(name string, urls []string) (cr []CR) {
 	return
 }
 
-func SortByTime(name string, limit int) (lt []CountData) {
-	v, ok := dataMap.Load(name)
+func SortByTime(name string, limit int) (lt []data.CountData) {
+	v, ok := data.DataMap.Load(name)
 	if !ok {
 		return
 	}
-	dataList := v.(*[]*CountData)
+	dataList := v.(*[]*data.CountData)
 
 	for i, _ := range *dataList {
 		if i >= limit {
@@ -227,6 +208,8 @@ func CreateUVTable(name string) (err error) {
 }
 
 func GetUVIPList(name string) (list *set.Set) {
+	list = set.New()
+
 	query := `SELECT ip FROM uv_%s`
 	rows, err := db.Query(fmt.Sprintf(query, name))
 	if err != nil {
@@ -234,7 +217,6 @@ func GetUVIPList(name string) (list *set.Set) {
 	}
 	defer rows.Close()
 
-	list = set.New()
 	for rows.Next() {
 		var ip string
 		err = rows.Scan(&ip)
