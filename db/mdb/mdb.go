@@ -56,13 +56,18 @@ func CreateTable(name string) (err error) {
 		return
 	}
 
-	lst := make([]*data.CountData, 0)
+	dl := make([]*data.CountData, 0)
 	for _, d := range dataList {
-		lst = append(lst, &d)
-		log.Trace("net", "load:", d.User, d.Time)
+		dt := new(data.CountData)
+		dt.Update = false
+		dt.Title = d.Title
+		dt.Time = d.Time
+		dt.Url = d.Url
+		dt.User = d.User
+		dl = append(dl, dt)
 	}
 
-	data.DataMap.Store(name, &lst)
+	data.DataMap.Store(name, &dl)
 	return
 }
 

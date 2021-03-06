@@ -148,13 +148,13 @@ func add(w http.ResponseWriter, r *http.Request) {
 
 	ip := clientIP(r)
 	var num = 0
-	log.Trace("record", ip, "->", data.Host+data.Url, "[", data.Title, "]")
 	// 排除localhost统计
 	if strings.Index(data.Host, "localhost") == -1 {
 		num = db.AddCount(data.User, data.Title, data.Url)
 	} else {
 		num = db.GetCount(data.User, data.Url)
 	}
+	log.Trace("record", ip, "->", data.Host+data.Url, "[", data.Title, "] :", num)
 
 	uv := uv.Add(data.User, ip)
 	send(w, []byte(fmt.Sprintf(`{"time":%v,"uv":%v}`, num, uv)))
