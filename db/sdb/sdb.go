@@ -9,6 +9,7 @@ import (
 	"github.com/zngw/set"
 	"sort"
 	"sync"
+	"time"
 )
 
 var db *sql.DB
@@ -16,12 +17,29 @@ var lock sync.Mutex //记数互斥锁
 
 func Init() (err error) {
 	db, err = sql.Open("sqlite3", cfg.Cfg.DBFile)
+
 	return
 }
 
 // 文章浏览次数 ===========================================
 func CreateTable(name string) (err error) {
 	table := `
+    CREATE TABLE IF NOT EXISTS log_%s (
+        uid INTEGER PRIMARY KEY AUTOINCREMENT,
+        title VARCHAR(128) NULL,
+        url VARCHAR(64) NULL,
+		time INTEGER NULL,
+		ip VARCHAR(32) NULL,
+		date INTEGER NULL
+    );
+    `
+	cmd := fmt.Sprintf(table, name)
+	_, err = db.Exec(cmd)
+	if err != nil {
+		return
+	}
+
+	table = `
     CREATE TABLE IF NOT EXISTS %s (
         uid INTEGER PRIMARY KEY AUTOINCREMENT,
         title VARCHAR(128) NULL,
@@ -29,7 +47,7 @@ func CreateTable(name string) (err error) {
 		time INTEGER NULL
     );
     `
-	cmd := fmt.Sprintf(table, name)
+	cmd = fmt.Sprintf(table, name)
 	_, err = db.Exec(cmd)
 	if err != nil {
 		return
@@ -88,7 +106,7 @@ func Save() {
 	})
 }
 
-func AddCount(name, title, url string) int {
+func AddCount(name, title, url, ip string) int {
 	v, ok := data.DataMap.Load(name)
 	if !ok {
 		return 0
@@ -97,10 +115,13 @@ func AddCount(name, title, url string) int {
 	dataList := v.(*[]*data.CountData)
 	lock.Lock()
 	defer lock.Unlock()
+
+	var dt *data.CountData = nil
 	for i, _ := range *dataList {
-		dt := (*dataList)[i]
-		if dt.Url == url {
+		tmp := (*dataList)[i]
+		if tmp.Url == url {
 			// 存在
+			dt = tmp
 			dt.Time++
 			dt.Update = true
 
@@ -109,26 +130,43 @@ func AddCount(name, title, url string) int {
 				(*dataList)[i] = (*dataList)[i-1]
 				(*dataList)[i-1] = dt
 			}
-			return dt.Time
+			break
 		}
 	}
 
-	// 不存在，插入
-	dt := new(data.CountData)
-	dt.Url = url
-	dt.Time = 1
-	dt.Title = title
-	*dataList = append(*dataList, dt)
+	if dt == nil {
+		// 不存在，插入
+		dt = new(data.CountData)
+		dt.Url = url
+		dt.Time = 1
+		dt.Title = title
+		*dataList = append(*dataList, dt)
+
+		go func() {
+			// 插入数据
+			pre := `INSERT INTO %s (title, url, time) values(?,?,?)`
+			stmt, err := db.Prepare(fmt.Sprintf(pre, name))
+			if stmt == nil || err != nil {
+				return
+			}
+
+			_, _ = stmt.Exec(dt.Title, dt.Url, dt.Time)
+			_ = stmt.Close()
+		}()
+	}
+
+	dt.Date = time.Now().Unix()
+	dt.Ip = ip
 
 	go func() {
 		// 插入数据
-		pre := `INSERT INTO %s (title, url, time) values(?,?,?)`
+		pre := `INSERT INTO log_%s (title, url, time, ip, date) values(?,?,?,?,?)`
 		stmt, err := db.Prepare(fmt.Sprintf(pre, name))
 		if stmt == nil || err != nil {
 			return
 		}
 
-		_, _ = stmt.Exec(dt.Title, dt.Url, dt.Time)
+		_, _ = stmt.Exec(dt.Title, dt.Url, dt.Time, dt.Ip, dt.Date)
 		_ = stmt.Close()
 	}()
 
@@ -174,19 +212,50 @@ func GetCounts(name string, urls []string) (cr []data.CR) {
 	return
 }
 
-func SortByTime(name string, limit int) (lt []data.CountData) {
-	v, ok := data.DataMap.Load(name)
-	if !ok {
+func SortByTime(name string, limit, typ int) (lt []data.CountData) {
+	now := time.Now()
+	var begin int64 = 0
+
+	year := now.Year()
+	month := now.Month()
+	day := now.Day()
+
+	if typ == 1 {
+		// 当天
+		begin = time.Date(year, month, day, 0, 0, 0, 0, time.Local).Unix()
+	} else if typ == 2 {
+		begin = time.Date(year, month, day, 0, 0, 0, 0, time.Local).Unix()
+		week := now.Weekday()
+		begin -= (int64)(week * 86400)
+	} else if typ == 3 {
+		// 当月
+		begin = time.Date(year, month, 1, 0, 0, 0, 0, time.Local).Unix()
+	} else if typ == 4 {
+		// 当年
+		begin = time.Date(year, 1, 1, 0, 0, 0, 0, time.Local).Unix()
+	}
+
+	query := `SELECT SUM(1), title, url FROM log_%s WHERE url != "/" AND url != "" GROUP BY url ORDER BY SUM(1) DESC Limit %d`
+	rows, err := db.Query(fmt.Sprintf(query, name, limit))
+	if err != nil {
 		return
 	}
-	dataList := v.(*[]*data.CountData)
+	defer rows.Close()
 
-	for i, _ := range *dataList {
-		if i >= limit {
-			break
+	for rows.Next() {
+		var num int64
+		var title, url string
+		err = rows.Scan(&num, &title, &url)
+		if err != nil {
+			continue
 		}
 
-		lt = append(lt, *(*dataList)[i])
+		var cd data.CountData
+		cd.Url = url
+		cd.Title = title
+		cd.Time = int(num)
+		cd.User = name
+		lt = append(lt, cd)
 	}
 
 	return

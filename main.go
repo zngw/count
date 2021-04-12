@@ -150,7 +150,7 @@ func add(w http.ResponseWriter, r *http.Request) {
 	var num = 0
 	// 排除localhost统计
 	if strings.Index(data.Host, "localhost") == -1 {
-		num = db.AddCount(data.User, data.Title, data.Url)
+		num = db.AddCount(data.User, data.Title, data.Url, ip)
 	} else {
 		num = db.GetCount(data.User, data.Url)
 	}
@@ -194,6 +194,7 @@ func top(w http.ResponseWriter, r *http.Request) {
 	type tmp struct {
 		User  string `json:"user"`  // 用户
 		Limit int    `json:"limit"` // 限制数
+		Type  int    `json:"type"`  // 查询类型，0-全部，1-当天，2-当周，3-当月，4-当年
 	}
 
 	var data tmp
@@ -207,7 +208,7 @@ func top(w http.ResponseWriter, r *http.Request) {
 		send(w, []byte(`[]`))
 	}
 
-	ls := db.SortByTime(data.User, data.Limit)
+	ls := db.SortByTime(data.User, data.Limit, data.Type)
 	if ls == nil {
 		send(w, []byte("[]"))
 		return
@@ -220,8 +221,8 @@ func top(w http.ResponseWriter, r *http.Request) {
 // sqlite3 转 mongdb
 func tranS2M() {
 	user := "guoke3915"
-	sdb.Init()
-	mdb.Init()
+	_ = sdb.Init()
+	_ = mdb.Init()
 	// 读取 Count
 	err := sdb.CreateTable(user)
 	if err != nil {

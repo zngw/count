@@ -9,11 +9,13 @@ import "sync"
 var DataMap sync.Map //根据数据特性这里用降序list
 
 type CountData struct {
-	Title  string `json:"title"  bson:"title"`
-	Url    string `json:"url"    bson:"url"`
-	Time   int    `json:"time"   bson:"time"`
-	Update bool   `json:"update" bson:"update"`
-	User   string `json:"user"   bson:"user"`
+	Title  string `json:"title"  bson:"title,omitempty"`
+	Url    string `json:"url"    bson:"url,omitempty"`
+	Time   int    `json:"time"   bson:"time,omitempty"`
+	Update bool   `json:"update" bson:"update,omitempty"`
+	User   string `json:"user"   bson:"user,omitempty"`
+	Ip     string `json:"ip"     bson:"ip,omitempty"`
+	Date   int64  `json:"date"   bson:"date,omitempty"`
 }
 
 type CR struct {

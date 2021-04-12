@@ -44,11 +44,11 @@ func CreateTable(name string) (err error) {
 	return
 }
 
-func AddCount(name, title, url string) int {
+func AddCount(name, title, url, ip string) int {
 	if cfg.Cfg.DBType == "mdb" {
-		return mdb.AddCount(name, title, url)
+		return mdb.AddCount(name, title, url, ip)
 	} else if cfg.Cfg.DBType == "sdb" {
-		return sdb.AddCount(name, title, url)
+		return sdb.AddCount(name, title, url, ip)
 	}
 
 	return 0
@@ -74,11 +74,30 @@ func GetCounts(name string, urls []string) (cr []data.CR) {
 	return
 }
 
-func SortByTime(name string, limit int) (lt []data.CountData) {
+func SortByTime(name string, limit, typ int) (lt []data.CountData) {
+	if typ <= 0 {
+		// 日期等于0时，从内存获取所有的
+		v, ok := data.DataMap.Load(name)
+		if !ok {
+			return
+		}
+		dataList := v.(*[]*data.CountData)
+
+		for i, _ := range *dataList {
+			if i >= limit {
+				break
+			}
+
+			lt = append(lt, *(*dataList)[i])
+		}
+
+		return
+	}
+
 	if cfg.Cfg.DBType == "mdb" {
-		return mdb.SortByTime(name, limit)
+		return mdb.SortByTime(name, limit, typ)
 	} else if cfg.Cfg.DBType == "sdb" {
-		return sdb.SortByTime(name, limit)
+		return sdb.SortByTime(name, limit, typ)
 	}
 
 	return

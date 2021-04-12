@@ -13,8 +13,10 @@ import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"sync"
+	"time"
 )
 
+const DbcLog = "Log"     // log
 const DbcCount = "Count" // 记数
 const DbcUV = "UV"       // UV
 
@@ -98,19 +100,23 @@ func Save() {
 	})
 }
 
-func AddCount(name, title, url string) int {
+func AddCount(name, title, url, ip string) int {
 	v, ok := data.DataMap.Load(name)
 	if !ok {
 		return 0
 	}
+
 	//dataList := v.([]*CountData)
 	dataList := v.(*[]*data.CountData)
 	lock.Lock()
 	defer lock.Unlock()
+
+	var dt *data.CountData = nil
 	for i, _ := range *dataList {
-		dt := (*dataList)[i]
-		if dt.Url == url {
+		tmp := (*dataList)[i]
+		if tmp.Url == url {
 			// 存在
+			dt = tmp
 			dt.Time++
 			dt.Update = true
 
@@ -119,21 +125,36 @@ func AddCount(name, title, url string) int {
 				(*dataList)[i] = (*dataList)[i-1]
 				(*dataList)[i-1] = dt
 			}
-			return dt.Time
+			break
 		}
 	}
 
-	// 不存在，插入
-	dt := new(data.CountData)
-	dt.User = name
-	dt.Url = url
-	dt.Time = 1
-	dt.Title = title
-	*dataList = append(*dataList, dt)
+	if dt == nil {
+		// 不存在，插入
+		dt = new(data.CountData)
+		dt.User = name
+		dt.Url = url
+		dt.Time = 1
+		dt.Title = title
+		*dataList = append(*dataList, dt)
 
+		go func() {
+			// 插入数据
+			c := dbc(name, DbcCount)
+			err := c.Insert(dt)
+			if err != nil {
+				return
+			}
+		}()
+	}
+
+	dt.Date = time.Now().Unix()
+	dt.Ip = ip
+
+	// 插入流水日志
 	go func() {
-		// 插入数据
-		c := dbc(name, DbcCount)
+		// 插入流水数据
+		c := dbc(name, DbcLog)
 		err := c.Insert(dt)
 		if err != nil {
 			return
@@ -182,21 +203,41 @@ func GetCounts(name string, urls []string) (cr []data.CR) {
 	return
 }
 
-func SortByTime(name string, limit int) (lt []data.CountData) {
-	v, ok := data.DataMap.Load(name)
-	if !ok {
+func SortByTime(name string, limit, typ int) (lt []data.CountData) {
+	now := time.Now()
+	var begin int64 = 0
+
+	year := now.Year()
+	month := now.Month()
+	day := now.Day()
+
+	if typ == 1 {
+		// 当天
+		begin = time.Date(year, month, day, 0, 0, 0, 0, time.Local).Unix()
+	} else if typ == 2 {
+		begin = time.Date(year, month, day, 0, 0, 0, 0, time.Local).Unix()
+		week := now.Weekday()
+		begin -= (int64)(week * 86400)
+	} else if typ == 3 {
+		// 当月
+		begin = time.Date(year, month, 1, 0, 0, 0, 0, time.Local).Unix()
+	} else if typ == 4 {
+		// 当年
+		begin = time.Date(year, 1, 1, 0, 0, 0, 0, time.Local).Unix()
+	}
+
+	c := dbc(name, DbcLog)
+	m := []bson.M{
+		{"$match": bson.M{"user": name, "url": bson.M{"$ne": "/"}, "date": bson.M{"$gte": begin}}},
+		{"$group": bson.M{"_id": "$url", "time": bson.M{"$sum": 1}, "title": bson.M{"$first": "$title"}, "url": bson.M{"$first": "$url"}}},
+		{"$sort": bson.M{"time": -1}},
+		{"$limit": limit},
+	}
+
+	err := c.Pipe(m).All(&lt)
+	if err != nil {
 		return
 	}
-	dataList := v.(*[]*data.CountData)
-
-	for i, _ := range *dataList {
-		if i >= limit {
-			break
-		}
-
-		lt = append(lt, *(*dataList)[i])
-	}
-
 	return
 }
 
